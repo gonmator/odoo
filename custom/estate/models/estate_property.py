@@ -1,5 +1,4 @@
 from odoo import fields, models
-from datetime import timedelta
 
 
 class EstateProperty(models.Model):
@@ -25,3 +24,5 @@ class EstateProperty(models.Model):
                                         ('offer_accepted', 'Offer Accepted'), ('sold', 'Sold'),
                                         ('canceled', 'Canceled')],
                              required=True, copy=False, default='new')
+    property_type_id = fields.Many2one(comodel_name='estate.property.type')
+    # tag_ids = fields.Many2many()
