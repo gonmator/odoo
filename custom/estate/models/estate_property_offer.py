@@ -1,4 +1,4 @@
-from odoo import api, fields, models
+from odoo import api, exceptions, fields, models
 
 
 class EstatePropertyOffer(models.Model):
@@ -22,3 +22,23 @@ class EstatePropertyOffer(models.Model):
         for record in self:
             create_date = record.create_date.date() if record.create_date else fields.Date.today()
             record.validity = fields.Date.subtract(record.date_deadline - create_date).days
+
+    def action_accept(self):
+        if len(self) > 1:
+            raise exceptions.UserError('Only one offer can be accepted.')
+        property_id = self.property_id.id
+        property_offers = self.env['estate.property.offer'].search([('property_id', '=', property_id)])
+        if any(r.status == 'accepted' for r in property_offers):
+            raise exceptions.UserError('An offer has been already accepted.')
+        # we only have one record here
+        self.status = 'accepted'
+        self.property_id.buyer_id = self.partner_id
+        self.property_id.selling_price = self.price
+        return True
+
+    def action_refuse(self):
+        for record in self:
+            record.status = 'refused'
+            self.property_id.buyer_id = None
+            self.property_id.selling_price = 0.0
+        return True
