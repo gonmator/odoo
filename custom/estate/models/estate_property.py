@@ -1,4 +1,4 @@
-from odoo import api, exceptions, fields, models
+from odoo import api, exceptions, fields, models, tools
 
 
 class EstateProperty(models.Model):
@@ -44,7 +44,11 @@ class EstateProperty(models.Model):
     @api.depends('offer_ids')
     def _compute_highest_offer_price(self):
         for record in self:
-            record.best_offer = max(record.offer_ids.mapped('price'))
+            offers = record.offer_ids.mapped('price')
+            if len(offers):
+                record.best_offer = max(offers)
+            else:
+                record.best_offer = 0.0
 
     @api.onchange('garden')
     def _onchange_garden(self):
@@ -68,3 +72,18 @@ class EstateProperty(models.Model):
                 raise exceptions.UserError('Sold properties cannot be cancelled.')
             record.state = 'canceled'
         return True
+
+    _sql_constraints = [
+        ('check_expected_price', 'CHECK(expected_price > 0.0)', 'The expected price must be strictly positive.'),
+        ('check_selling_price', 'CHECK(selling_price >= 0.0)', 'The selling price must be positive.')
+    ]
+
+    @api.constrains('selling_price', 'expected_price')
+    def _check_selling_price(self):
+        for record in self:
+            # if selling_price == 0.0 that means not offer has been accepted.
+            if not tools.float_is_zero(record.selling_price, precision_rounding=0.01):
+                if tools.float_compare(record.selling_price, record.expected_price * 0.9, precision_rounding=0.01) < 0:
+                    raise exceptions.ValidationError(
+                        'The selling price must be at least 90% of the expected price! '
+                        'You must reduce the expected price if you want to accept this offer.')
