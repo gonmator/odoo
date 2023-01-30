@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <odoo>
     <record id="estate_property_action" model="ir.actions.act_window">
-        <field name="name">Property View</field>
+        <field name="name">Properties</field>
         <field name="res_model">estate.property</field>
         <field name="view_mode">tree,form</field>
     </record>
@@ -18,7 +18,6 @@
                 <field name="expected_price" />
                 <field name="selling_price" />
                 <field name="date_availability" />
-                <field name="tag_ids"/>
             </tree>
         </field>
     </record>
@@ -29,8 +28,9 @@
         <field name="arch" type="xml">
             <form string="Property">
                 <header>
-                    <button string="SOLD" type="object" name="action_sold"/>
-                    <button string="CANCEL" type="object" name="action_cancel"/>
+                    <button string="SOLD" type="object" name="action_sold" states="new,offer_received,offer_accepted"/>
+                    <button string="CANCEL" type="object" name="action_cancel" states="new,offer_received,offer_accepted"/>
+                    <field name="state" widget="statusbar" statusbar_visible="new,offer_received,offer_accepted,sold"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -39,12 +39,12 @@
                         </h1>
                     </div>
                     <group col="1">
-                        <field name="tag_ids" widget="many2many_tags"/>
+                        <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"/>
                     </group>
                     <group>
                         <group>
-                            <field name="state" string="Status" />
-                            <field name="property_type_id"/>
+                            <field name="property_type_id" widget="many2one"
+                                   options="{'no_create': True, 'no_open': True}"/>
                             <field name="postcode" colspan="1"/>
                             <field name="date_availability" string="Available From"/>
                         </group>
@@ -64,14 +64,17 @@
                                     <field name="facades" />
                                     <field name="garage" />
                                     <field name="garden" />
-                                    <field name="garden_area" string="Garden Area (sqm)" />
-                                    <field name="garden_orientation" />
+                                    <field name="garden_area" string="Garden Area (sqm)"
+                                           attrs="{'invisible': [('garden','=',False)]}"/>
+                                    <field name="garden_orientation"
+                                           attrs="{'invisible': [('garden','=',False)]}"/>
                                     <field name="total_area" string="Total Area (sqm)" />
                                 </group>
                             </group>
                         </page>
                         <page string="Offers">
-                            <field name="offer_ids"/>
+                            <field name="offer_ids"
+                                   attrs="{'readonly': [('state','in',['offer_accepted', 'sold', 'canceled'])]}"/>
                         </page>
                         <page string="Other Info">
                             <group>

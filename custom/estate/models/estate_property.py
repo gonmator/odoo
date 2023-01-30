@@ -4,6 +4,11 @@ from odoo import api, exceptions, fields, models, tools
 class EstateProperty(models.Model):
     _name = 'estate.property'
     _description = 'Estate Property'
+    _sql_constraints = [
+        ('check_expected_price', 'CHECK(expected_price > 0.0)', 'The expected price must be strictly positive.'),
+        ('check_selling_price', 'CHECK(selling_price >= 0.0)', 'The selling price must be positive.')
+    ]
+    _order = 'id desc'
 
     name = fields.Char(required=True)
     active = fields.Boolean(default=True)
@@ -36,6 +41,20 @@ class EstateProperty(models.Model):
     salesperson_id = fields.Many2one(string='Salesman', default=lambda self: self.env.user, comodel_name='res.users')
     buyer_id = fields.Many2one(comodel_name='res.partner', copy=False)
 
+    def action_sold(self):
+        for record in self:
+            if record.state == 'canceled':
+                raise exceptions.UserError('Canceled properties cannot be sold.')
+            record.state = 'sold'
+        return True
+
+    def action_cancel(self):
+        for record in self:
+            if record.state == 'sold':
+                raise exceptions.UserError('Sold properties cannot be cancelled.')
+            record.state = 'canceled'
+        return True
+
     @api.depends('living_area', 'garden_area')
     def _compute_total_area(self):
         for record in self:
@@ -59,24 +78,12 @@ class EstateProperty(models.Model):
             self.garden_area = 0
             self.garden_orientation = ''
 
-    def action_sold(self):
-        for record in self:
-            if record.state == 'canceled':
-                raise exceptions.UserError('Canceled properties cannot be sold.')
-            record.state = 'sold'
-        return True
-
-    def action_cancel(self):
-        for record in self:
-            if record.state == 'sold':
-                raise exceptions.UserError('Sold properties cannot be cancelled.')
-            record.state = 'canceled'
-        return True
-
-    _sql_constraints = [
-        ('check_expected_price', 'CHECK(expected_price > 0.0)', 'The expected price must be strictly positive.'),
-        ('check_selling_price', 'CHECK(selling_price >= 0.0)', 'The selling price must be positive.')
-    ]
+    @api.onchange('offer_ids')
+    def _onchange_offer_id(self):
+        if self.state == 'new' and len(self.offer_ids) > 0:
+            self.state = 'offer_received'
+        elif self.state == 'offer_received' and len(self.offer_ids) == 0:
+            self.state = 'new'
 
     @api.constrains('selling_price', 'expected_price')
     def _check_selling_price(self):
@@ -87,3 +94,7 @@ class EstateProperty(models.Model):
                     raise exceptions.ValidationError(
                         'The selling price must be at least 90% of the expected price! '
                         'You must reduce the expected price if you want to accept this offer.')
+
+    def _is_there_offer_accepted(self, property_id):
+        property_offers = self.env['estate.property.offer'].search([('property_id', '=', property_id)])
+        return any(r.status == 'accepted' for r in property_offers)
