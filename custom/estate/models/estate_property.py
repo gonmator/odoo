@@ -80,10 +80,13 @@ class EstateProperty(models.Model):
 
     @api.onchange('offer_ids')
     def _onchange_offer_id(self):
-        if self.state == 'new' and len(self.offer_ids) > 0:
-            self.state = 'offer_received'
-        elif self.state == 'offer_received' and len(self.offer_ids) == 0:
+        if self.state == 'offer_received' and len(self.offer_ids) == 0:
             self.state = 'new'
+
+    @api.ondelete(at_uninstall=False)
+    def _unlink_if_new_or_cancelled(self):
+        if self.state not in ['new' or 'canceled']:
+            raise exceptions.UserError('Only new and canceled properties can be deleted.')
 
     @api.constrains('selling_price', 'expected_price')
     def _check_selling_price(self):
