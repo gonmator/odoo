@@ -7,7 +7,7 @@
             <field name="inherit_id" ref="base.view_users_form"/>
             <field name="arch" type="xml">
                 <xpath expr="//notebook/page[@name='preferences']" position="after">
-                    <page string="Real State Properties" name="estate.properties">
+                    <page name="estate.properties" string="Real State Properties">
                         <field name="property_ids" readonly="1" nolabel="1"/>
                     </page>
                 </xpath>

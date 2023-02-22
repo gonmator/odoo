@@ -17,6 +17,32 @@ class EstatePropertyOffer(models.Model):
     date_deadline = fields.Date(compute='_compute_deadline', inverse='_inverse_deadline')
     property_type_id = fields.Many2one(related='property_id.property_type_id', store=True)
 
+    @api.depends('create_date', 'validity')
+    def _compute_deadline(self):
+        for record in self:
+            create_date = record.create_date.date() if record.create_date else fields.Date.today()
+            record.date_deadline = fields.Date.add(create_date, days=record.validity)
+
+    def _inverse_deadline(self):
+        for record in self:
+            create_date = record.create_date.date() if record.create_date else fields.Date.today()
+            record.validity = fields.Date.subtract(record.date_deadline - create_date).days
+
+    def create(self, vals_list):
+        if type(vals_list) == dict:
+            vals_list = [vals_list]
+        for vals in vals_list:
+            property = self.env['estate.property'].browse([vals['property_id']])
+            if len(property.offer_ids) > 0:
+                assert property.state != 'new'
+                lowest_price = min([offer_id.price for offer_id in property.offer_ids])
+                if vals['price'] < lowest_price:
+                    raise exceptions.UserError(f'The offer must be higher than {lowest_price}.')
+            if property.state == 'new':
+                assert len(property.offer_ids) == 0
+                property.state = 'offer_received'
+        return super().create(vals_list)
+
     def action_accept(self):
         if len(self) > 1:
             raise exceptions.UserError('Only one offer can be accepted.')
@@ -41,29 +67,3 @@ class EstatePropertyOffer(models.Model):
             if not self.property_id._is_there_offer_accepted(self.property_id.id):
                 self.property_id.state = 'offer_received'
         return True
-
-    def create(self, vals_list):
-        if type(vals_list) == dict:
-            vals_list = [vals_list]
-        for vals in vals_list:
-            property = self.env['estate.property'].browse([vals['property_id']])
-            if len(property.offer_ids) > 0:
-                assert property.state != 'new'
-                lowest_price = min([offer_id.price for offer_id in property.offer_ids])
-                if vals['price'] < lowest_price:
-                    raise exceptions.UserError(f'The offer must be higher than {lowest_price}.')
-            if property.state == 'new':
-                assert len(property.offer_ids) == 0
-                property.state = 'offer_received'
-        return super().create(vals_list)
-
-    @api.depends('create_date', 'validity')
-    def _compute_deadline(self):
-        for record in self:
-            create_date = record.create_date.date() if record.create_date else fields.Date.today()
-            record.date_deadline = fields.Date.add(create_date, days=record.validity)
-
-    def _inverse_deadline(self):
-        for record in self:
-            create_date = record.create_date.date() if record.create_date else fields.Date.today()
-            record.validity = fields.Date.subtract(record.date_deadline - create_date).days

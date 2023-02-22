@@ -17,7 +17,7 @@
                 <field name="name" string="Title" />
                 <field name="property_type_id"/>
                 <field name="postcode" />
-                <field name="tag_ids" widget="many2many_tags"/>
+                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"/>
                 <field name="bedrooms" />
                 <field name="living_area" string="Living Area (sqm)" />
                 <field name="expected_price" />
@@ -34,8 +34,8 @@
         <field name="arch" type="xml">
             <form string="Property">
                 <header>
-                    <button string="SOLD" type="object" name="action_sold" states="new,offer_received,offer_accepted"/>
-                    <button string="CANCEL" type="object" name="action_cancel" states="new,offer_received,offer_accepted"/>
+                    <button name="action_sold" string="SOLD" type="object" states="new,offer_received,offer_accepted"/>
+                    <button name="action_cancel" string="CANCEL" type="object" states="new,offer_received,offer_accepted"/>
                     <field name="state" widget="statusbar" statusbar_visible="new,offer_received,offer_accepted,sold"/>
                 </header>
                 <sheet>

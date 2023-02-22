@@ -41,25 +41,6 @@ class EstateProperty(models.Model):
     salesperson_id = fields.Many2one(string='Salesman', default=lambda self: self.env.user, comodel_name='res.users')
     buyer_id = fields.Many2one(comodel_name='res.partner', copy=False)
 
-    def action_sold(self):
-        for record in self:
-            if record.state == 'canceled':
-                raise exceptions.UserError('Canceled properties cannot be sold.')
-            record.state = 'sold'
-        return True
-
-    def action_cancel(self):
-        for record in self:
-            if record.state == 'sold':
-                raise exceptions.UserError('Sold properties cannot be cancelled.')
-            record.state = 'canceled'
-        return True
-
-    @api.depends('living_area', 'garden_area')
-    def _compute_total_area(self):
-        for record in self:
-            record.total_area = record.living_area + record.garden_area
-
     @api.depends('offer_ids')
     def _compute_highest_offer_price(self):
         for record in self:
@@ -68,6 +49,21 @@ class EstateProperty(models.Model):
                 record.best_offer = max(offers)
             else:
                 record.best_offer = 0.0
+
+    @api.depends('living_area', 'garden_area')
+    def _compute_total_area(self):
+        for record in self:
+            record.total_area = record.living_area + record.garden_area
+
+    @api.constrains('selling_price', 'expected_price')
+    def _check_selling_price(self):
+        for record in self:
+            # if selling_price == 0.0 that means not offer has been accepted.
+            if not tools.float_is_zero(record.selling_price, precision_rounding=0.01):
+                if tools.float_compare(record.selling_price, record.expected_price * 0.9, precision_rounding=0.01) < 0:
+                    raise exceptions.ValidationError(
+                        'The selling price must be at least 90% of the expected price! '
+                        'You must reduce the expected price if you want to accept this offer.')
 
     @api.onchange('garden')
     def _onchange_garden(self):
@@ -88,15 +84,19 @@ class EstateProperty(models.Model):
         if self.state not in ['new' or 'canceled']:
             raise exceptions.UserError('Only new and canceled properties can be deleted.')
 
-    @api.constrains('selling_price', 'expected_price')
-    def _check_selling_price(self):
-        for record in self:
-            # if selling_price == 0.0 that means not offer has been accepted.
-            if not tools.float_is_zero(record.selling_price, precision_rounding=0.01):
-                if tools.float_compare(record.selling_price, record.expected_price * 0.9, precision_rounding=0.01) < 0:
-                    raise exceptions.ValidationError(
-                        'The selling price must be at least 90% of the expected price! '
-                        'You must reduce the expected price if you want to accept this offer.')
+    def action_sold(self):
+        self.ensure_one()
+        if self.state == 'canceled':
+            raise exceptions.UserError('Canceled properties cannot be sold.')
+        self.state = 'sold'
+        return True
+
+    def action_cancel(self):
+        self.ensure_one()
+        if self.state == 'sold':
+            raise exceptions.UserError('Sold properties cannot be cancelled.')
+        self.state = 'canceled'
+        return True
 
     def _is_there_offer_accepted(self, property_id):
         property_offers = self.env['estate.property.offer'].search([('property_id', '=', property_id)])
